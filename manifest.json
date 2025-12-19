@@ -1,0 +1,10 @@
+{
+  "id": "claude-code-launcher",
+  "name": "Claude Code Launcher",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Launch Claude Code CLI with the current note for AI-assisted editing",
+  "author": "Palermo Spenano",
+  "authorUrl": "",
+  "isDesktopOnly": true
+}

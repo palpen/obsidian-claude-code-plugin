@@ -1,0 +1,19 @@
+{
+  "name": "obsidian-claude-code-plugin",
+  "version": "1.0.0",
+  "description": "Launch Claude Code CLI with current note context",
+  "main": "main.js",
+  "scripts": {
+    "dev": "esbuild main.ts --bundle --external:obsidian --outfile=main.js --platform=node --format=cjs --watch",
+    "build": "esbuild main.ts --bundle --external:obsidian --outfile=main.js --platform=node --format=cjs"
+  },
+  "keywords": ["obsidian", "plugin", "claude", "ai"],
+  "author": "Palermo Spenano",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "esbuild": "^0.19.0",
+    "obsidian": "latest",
+    "typescript": "^5.3.0"
+  }
+}
