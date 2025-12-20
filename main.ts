@@ -3,6 +3,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 
 const execAsync = promisify(exec);
 
@@ -159,45 +160,63 @@ export default class ClaudeCodePlugin extends Plugin {
     return null;
   }
 
-  private escapeForAppleScript(str: string): string {
-    // Escape backslashes and double quotes for AppleScript string literals
-    // AppleScript uses backslash for escaping within double-quoted strings
-    return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  private escapeShellArg(arg: string): string {
+    // Wrap argument in single quotes and escape any single quotes within
+    // This is the standard POSIX shell escaping method
+    return `'${arg.replace(/'/g, "'\\''")}'`;
   }
 
   private async launchTerminal(directory: string, notePath: string): Promise<void> {
-    // Build command as array to avoid shell injection
-    // We'll pass this as a single-quoted string to avoid any shell interpretation
-    const commandParts = [
+    // Build shell command with proper escaping
+    const shellCommand = [
       'cd',
-      directory,
+      this.escapeShellArg(directory),
       '&&',
-      this.claudeCodePath!,
-      `@${notePath}`
-    ];
+      this.escapeShellArg(this.claudeCodePath!),
+      this.escapeShellArg(`@${notePath}`)
+    ].join(' ');
 
-    // Use printf to safely construct the command with proper quoting
-    // This ensures each argument is treated as a literal string
-    const safeCommand = commandParts.map(part => {
-      // Escape single quotes by ending the quote, adding escaped quote, starting new quote
-      const escaped = part.replace(/'/g, "'\\''");
-      return `'${escaped}'`;
-    }).join(' ');
+    // Create AppleScript content
+    // Use AppleScript's quoted form to properly escape the shell command
+    const appleScriptContent = `
+tell application "Terminal"
+  activate
+  if (count of windows) > 0 then
+    tell application "System Events" to tell process "Terminal"
+      keystroke "t" using command down
+    end tell
+    delay 0.1
+    do script "${shellCommand.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}" in selected tab of front window
+  else
+    do script "${shellCommand.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"
+  end if
+end tell
+`;
 
-    // Escape the entire command for AppleScript
-    const appleScriptCommand = this.escapeForAppleScript(safeCommand);
+    // Write AppleScript to temp file to avoid all quote-escaping complexity
+    const tempFile = path.join(os.tmpdir(), `obsidian-claude-${Date.now()}.scpt`);
 
-    // If Terminal has windows, create new tab (Cmd+T), otherwise create new window
-    const script = `osascript -e 'tell application "Terminal"' -e 'activate' -e 'if (count of windows) > 0 then' -e 'tell application "System Events" to tell process "Terminal" to keystroke "t" using command down' -e 'delay 0.1' -e 'do script "${appleScriptCommand}" in selected tab of front window' -e 'else' -e 'do script "${appleScriptCommand}"' -e 'end if' -e 'end tell'`;
+    try {
+      fs.writeFileSync(tempFile, appleScriptContent, 'utf8');
 
-    return new Promise<void>((resolve, reject) => {
-      exec(script, (error) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve();
-        }
+      return new Promise<void>((resolve, reject) => {
+        exec(`osascript "${tempFile}"`, (error) => {
+          // Clean up temp file
+          try {
+            fs.unlinkSync(tempFile);
+          } catch (cleanupError) {
+            console.error('Failed to delete temp AppleScript file:', cleanupError);
+          }
+
+          if (error) {
+            reject(error);
+          } else {
+            resolve();
+          }
+        });
       });
-    });
+    } catch (writeError) {
+      throw new Error(`Failed to write AppleScript temp file: ${writeError.message}`);
+    }
   }
 }
