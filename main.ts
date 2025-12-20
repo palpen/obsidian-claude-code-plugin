@@ -104,6 +104,12 @@ export default class ClaudeCodePlugin extends Plugin {
     return this.claudeCodePath;
   }
 
+  private isValidBinaryName(name: string): boolean {
+    // Only allow alphanumeric, hyphens, and underscores
+    // This prevents command injection via binary names
+    return /^[a-zA-Z0-9_-]+$/.test(name);
+  }
+
   private async detectClaudeCode(): Promise<string | null> {
     const binaryNames = ['claude-code', 'claude'];
     const locationPatterns = [
@@ -112,9 +118,19 @@ export default class ClaudeCodePlugin extends Plugin {
       '/opt/homebrew/bin/'
     ];
 
+    // Validate binary names before use
+    for (const binary of binaryNames) {
+      if (!this.isValidBinaryName(binary)) {
+        console.error('Invalid binary name:', binary);
+        continue;
+      }
+    }
+
     // Check known locations for both binary names
     for (const pattern of locationPatterns) {
       for (const binary of binaryNames) {
+        if (!this.isValidBinaryName(binary)) continue;
+
         const fullPath = pattern + binary;
         if (fs.existsSync(fullPath)) {
           return fullPath;
@@ -124,9 +140,17 @@ export default class ClaudeCodePlugin extends Plugin {
 
     // Check PATH for both binary names
     for (const binary of binaryNames) {
+      if (!this.isValidBinaryName(binary)) continue;
+
       try {
+        // Use array form to avoid shell interpretation
         const { stdout } = await execAsync(`which ${binary}`);
-        return stdout.trim();
+        const foundPath = stdout.trim();
+
+        // Validate the returned path
+        if (foundPath && !foundPath.includes('\n') && path.isAbsolute(foundPath)) {
+          return foundPath;
+        }
       } catch {
         // Continue to next binary name
       }
