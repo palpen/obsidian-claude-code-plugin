@@ -105,20 +105,36 @@ export default class ClaudeCodePlugin extends Plugin {
     return null;
   }
 
-  private escapePathForShell(path: string): string {
-    // Escape double quotes and backslashes for shell command inside AppleScript
-    return path.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  private escapeForAppleScript(str: string): string {
+    // Escape backslashes and double quotes for AppleScript string literals
+    // AppleScript uses backslash for escaping within double-quoted strings
+    return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   }
 
   private async launchTerminal(directory: string, notePath: string): Promise<void> {
-    const escapedDir = this.escapePathForShell(directory);
-    const escapedNote = this.escapePathForShell(notePath);
-    const escapedBinary = this.escapePathForShell(this.claudeCodePath!);
+    // Build command as array to avoid shell injection
+    // We'll pass this as a single-quoted string to avoid any shell interpretation
+    const commandParts = [
+      'cd',
+      directory,
+      '&&',
+      this.claudeCodePath!,
+      `@${notePath}`
+    ];
 
-    const command = `cd \\"${escapedDir}\\" && \\"${escapedBinary}\\" \\"@${escapedNote}\\"`;
+    // Use printf to safely construct the command with proper quoting
+    // This ensures each argument is treated as a literal string
+    const safeCommand = commandParts.map(part => {
+      // Escape single quotes by ending the quote, adding escaped quote, starting new quote
+      const escaped = part.replace(/'/g, "'\\''");
+      return `'${escaped}'`;
+    }).join(' ');
+
+    // Escape the entire command for AppleScript
+    const appleScriptCommand = this.escapeForAppleScript(safeCommand);
 
     // If Terminal has windows, create new tab (Cmd+T), otherwise create new window
-    const script = `osascript -e 'tell application "Terminal"' -e 'activate' -e 'if (count of windows) > 0 then' -e 'tell application "System Events" to tell process "Terminal" to keystroke "t" using command down' -e 'delay 0.1' -e 'do script "${command}" in selected tab of front window' -e 'else' -e 'do script "${command}"' -e 'end if' -e 'end tell'`;
+    const script = `osascript -e 'tell application "Terminal"' -e 'activate' -e 'if (count of windows) > 0 then' -e 'tell application "System Events" to tell process "Terminal" to keystroke "t" using command down' -e 'delay 0.1' -e 'do script "${appleScriptCommand}" in selected tab of front window' -e 'else' -e 'do script "${appleScriptCommand}"' -e 'end if' -e 'end tell'`;
 
     return new Promise<void>((resolve, reject) => {
       exec(script, (error) => {
