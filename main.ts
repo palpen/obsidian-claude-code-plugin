@@ -29,7 +29,13 @@ export default class ClaudeCodePlugin extends Plugin {
         return;
       }
 
-      const { fullPath, directory } = this.getFilePaths(file);
+      const filePaths = this.getFilePaths(file);
+      if (!filePaths) {
+        new Notice('Invalid file path detected. Please check the file location.');
+        return;
+      }
+
+      const { fullPath, directory } = filePaths;
       await this.launchTerminal(directory, fullPath);
 
     } catch (error) {
@@ -54,11 +60,35 @@ export default class ClaudeCodePlugin extends Plugin {
     return file;
   }
 
-  private getFilePaths(file: TFile): { fullPath: string; directory: string } {
+  private getFilePaths(file: TFile): { fullPath: string; directory: string } | null {
     const adapter = this.app.vault.adapter;
     const basePath = adapter.getBasePath();
 
-    const fullPath = path.join(basePath, file.path);
+    if (!basePath || basePath.trim() === '') {
+      console.error('Invalid vault base path');
+      return null;
+    }
+
+    // Normalize and validate the file path
+    const normalizedFilePath = path.normalize(file.path);
+
+    // Check for path traversal attempts
+    if (normalizedFilePath.includes('..') || path.isAbsolute(normalizedFilePath)) {
+      console.error('Invalid file path detected:', normalizedFilePath);
+      return null;
+    }
+
+    const fullPath = path.join(basePath, normalizedFilePath);
+
+    // Verify the resolved path is actually within the vault
+    const resolvedPath = path.resolve(fullPath);
+    const resolvedBase = path.resolve(basePath);
+
+    if (!resolvedPath.startsWith(resolvedBase + path.sep) && resolvedPath !== resolvedBase) {
+      console.error('File path outside vault:', resolvedPath);
+      return null;
+    }
+
     const directory = path.dirname(fullPath);
 
     return { fullPath, directory };
