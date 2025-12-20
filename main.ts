@@ -173,6 +173,8 @@ export default class ClaudeCodePlugin extends Plugin {
       this.escapeShellArg(directory),
       '&&',
       this.escapeShellArg(this.claudeCodePath!),
+      '--append-system-prompt',
+      this.escapeShellArg('When a file is provided with @, immediately read it using the Read tool'),
       this.escapeShellArg(`@${notePath}`)
     ].join(' ');
 
