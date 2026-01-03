@@ -1,6 +1,6 @@
 # Claude Code Launcher for Obsidian
 
-Launch Claude CLI directly from Obsidian with your current note automatically loaded for AI-assisted editing.
+Launch Claude CLI directly from Obsidian with your current note automatically loaded.
 
 ## Features
 
