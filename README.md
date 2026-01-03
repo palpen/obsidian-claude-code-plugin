@@ -139,10 +139,3 @@ The plugin searches for both `claude-code` and `claude` binaries in:
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
-## Contributing
-
-Issues and pull requests welcome. For major changes, please open an issue first to discuss.
-
-## Author
-
-Built by Palermo Spenano for seamless integration between Obsidian and Claude CLI.
